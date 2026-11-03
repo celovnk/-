@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Игра для Киры</title>
+<style>
+:root{--pink:#ff6f91;--pinkd:#d94f73;--ink:#3a2a33}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:linear-gradient(#ffe3ea,#fff5f7 60%,#e9f7ea);color:var(--ink);display:flex;justify-content:center;align-items:center;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.screen{display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:16px;padding:20px;width:100%;max-width:440px;height:100%;position:relative;z-index:1}
+.screen.on{display:flex;animation:fade .45s}
+@keyframes fade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+h1{font-size:30px}h2{font-size:22px}
+p{font-size:17px;line-height:1.45}
+.big{font-size:72px;line-height:1}
+.tag{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--pink)}
+button{font:inherit;font-size:18px;font-weight:700;border:0;border-radius:16px;padding:14px 26px;background:var(--pink);color:#fff;box-shadow:0 4px 0 var(--pinkd);cursor:pointer}
+button:active{transform:translateY(3px);box-shadow:0 1px 0 var(--pinkd)}
+.muted{opacity:.65;font-size:14px}
+.rps{display:flex;gap:12px}
+.rps button{font-size:38px;padding:10px 18px;background:#fff;box-shadow:0 4px 0 #f0c2cf}
+.bubble{background:#fff;border-radius:18px;padding:14px 16px;box-shadow:0 2px 12px rgba(0,0,0,.07);min-height:80px;width:100%;font-size:16px;line-height:1.45}
+.hud{font-weight:800;font-size:18px}
+canvas{background:linear-gradient(#cdeffd,#f3fbff);border-radius:20px;touch-action:none;box-shadow:0 4px 20px rgba(0,0,0,.08)}
+.scene{position:relative;width:300px;height:170px}
+.puddle{position:absolute;right:0;bottom:6px;width:130px;height:36px;border-radius:50%;background:radial-gradient(#9ad6ff,#3a8fd6)}
+.kira,.me{position:absolute;bottom:18px;font-size:64px;line-height:1}
+.kira{left:0}
+.me{left:95px;transition:transform .8s cubic-bezier(.5,-.3,.6,1.3)}
+.me.pushed{transform:translate(125px,22px) rotate(85deg)}
+.kira.push{animation:push .35s}
+@keyframes push{50%{transform:translateX(40px)}}
+.splash{position:absolute;right:30px;bottom:34px;font-size:54px;opacity:0}
+.splash.on{animation:spl .8s forwards}
+@keyframes spl{0%{opacity:0;transform:scale(.3)}40%{opacity:1;transform:scale(1.35)}100%{opacity:1;transform:scale(1)}}
+.card{background:#fff;border-radius:22px;padding:20px;box-shadow:0 6px 24px rgba(255,111,145,.18);font-size:17px;line-height:1.5}
+.card p+p{margin-top:10px}
+#field{position:fixed;left:0;right:0;bottom:0;height:45%;pointer-events:none;z-index:0;overflow:hidden}
+#field span{position:absolute;bottom:-10px;transform-origin:bottom center;animation:grow 1.2s cubic-bezier(.3,1.5,.6,1) both}
+@keyframes grow{from{transform:translateY(100%) scale(.2);opacity:0}to{transform:none;opacity:1}}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+
+<div id="field"></div>
+
+<section class="screen on" id="s-start">
+  <div class="big">🌯</div>
+  <h1>Игра для Киры</h1>
+  <p>Три коротких уровня.<br>Проиграть невозможно (почти).</p>
+  <button onclick="show('#s-intro1')">Играть</button>
+</section>
+
+<section class="screen" id="s-intro1">
+  <div class="tag">Уровень 1 · Шаурма-атака</div>
+  <div class="big">📱😩</div>
+  <p>Ситуация: я в школе, голодный.<br>А кто-то присылает мне кружок, как <b>сладко</b> ест шаурму.</p>
+  <p>Собери <b>12</b> шаурм 🌯.<br>Капли 💧 - это будущие лужи, от них уворачивайся.</p>
+  <p class="muted">Води пальцем по экрану</p>
+  <button onclick="startCatch()">Погнали</button>
+</section>
+
+<section class="screen" id="s-catch">
+  <div class="hud" id="hud">0 / 12</div>
+  <canvas id="cv"></canvas>
+</section>
+
+<section class="screen" id="s-catch-done">
+  <div class="big">🌯✨</div>
+  <h2>Кира сыта и довольна</h2>
+  <p>А я всё ещё голодный. Запомним.</p>
+  <button onclick="show('#s-rps')">Дальше</button>
+</section>
+
+<section class="screen" id="s-rps">
+  <div class="tag">Уровень 2 · Камень, ножницы, бумага</div>
+  <p>Правила, как всегда, расплывчатые.</p>
+  <div class="hud" id="rps-score">Счёт: я 0 - Кира 0</div>
+  <div class="bubble" id="rps-out">Выбирай 👇</div>
+  <div class="rps" id="rps-btns">
+    <button onclick="rps(0)">✊</button>
+    <button onclick="rps(1)">✌️</button>
+    <button onclick="rps(2)">✋</button>
+  </div>
+  <button id="rps-next" class="hide" onclick="show('#s-puddle')">Это нечестно 😤</button>
+</section>
+
+<section class="screen" id="s-puddle">
+  <div class="tag">Уровень 3 · Справедливость</div>
+  <p id="pud-text">Есть только один способ восстановить справедливость.</p>
+  <div class="scene">
+    <div class="kira" id="kira">👧</div>
+    <div class="me" id="me">👦</div>
+    <div class="puddle"></div>
+    <div class="splash" id="splash">💦</div>
+  </div>
+  <button id="push-btn" onclick="pushMe()">Толкнуть в лужу!</button>
+  <button id="pud-next" class="hide" onclick="finale()">Дальше</button>
+</section>
+
+<section class="screen" id="s-final">
+  <div class="big">🏆</div>
+  <h2>Кира - абсолютный чемпион</h2>
+  <p class="muted">по камень-ножницы-бумаге (по правилам лужи)</p>
+  <div class="card">
+    <p>Спасибо, что поддерживаешь меня - для меня это правда важно</p>
+  </div>
+  <button onclick="restart()">Сыграть ещё раз</button>
+</section>
+
+<script>
+const $=s=>document.querySelector(s);
+function show(id){document.querySelectorAll('.screen').forEach(e=>e.classList.remove('on'));$(id).classList.add('on')}
+
+const GOAL=12, EMOJI='"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+let cv,ctx,W,H,px,items,score,last,spawnT,running=false,flash;
+function startCatch(){
+  show('#s-catch');
+  cv=$('#cv');
+  const dpr=window.devicePixelRatio||1;
+  W=Math.min(innerWidth-32,420); H=Math.max(360,Math.min(innerHeight-110,580));
+  cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+'px'; cv.style.height=H+'px';
+  ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  px=W/2; items=[]; score=0; spawnT=300; flash=null; last=performance.now(); running=true;
+  hud(); requestAnimationFrame(loop);
+}
+function hud(){$('#hud').textContent=score+' / '+GOAL}
+function move(e){if(!cv)return;const r=cv.getBoundingClientRect();px=Math.max(26,Math.min(W-26,e.clientX-r.left))}
+document.addEventListener('pointermove',move);
+document.addEventListener('pointerdown',move);
+document.addEventListener('keydown',e=>{if(!running)return;if(e.key==='ArrowLeft')px=Math.max(26,px-34);if(e.key==='ArrowRight')px=Math.min(W-26,px+34)});
+function loop(t){
+  if(!running)return;
+  const dt=Math.min(50,t-last); last=t;
+  spawnT-=dt;
+  if(spawnT<=0){
+    spawnT=600+Math.random()*350;
+    const r=Math.random(), type=r<.75?'🌯':'💧';
+    items.push({x:24+Math.random()*(W-48),y:-30,v:(.11+Math.random()*.07)*(type==='💧'?1.25:1),type});
+  }
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#bfe6b8'; ctx.fillRect(0,H-40,W,40);
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle='#000';
+  const py=H-64;
+  ctx.font='34px '+EMOJI;
+  for(const it of items){
+    it.y+=it.v*dt; ctx.fillText(it.type,it.x,it.y);
+    if(!it.hit&&Math.abs(it.x-px)<40&&Math.abs(it.y-py)<36){
+      it.hit=true;
+      if(it.type==='💧'){score=Math.max(0,score-1);flash={txt:'плюх 💦',t:600}}
+      else{score++;flash={txt:'ням!',t:500}}
+      hud();
+    }
+  }
+  items=items.filter(i=>!i.hit&&i.y<H+40);
+  ctx.font='54px '+EMOJI; ctx.fillText('👧',px,py);
+  if(flash){flash.t-=dt;ctx.font='bold 20px system-ui,sans-serif';ctx.fillStyle='#ff6f91';ctx.fillText(flash.txt,px,py-52);if(flash.t<=0)flash=null}
+  if(score>=GOAL){running=false;setTimeout(()=>show('#s-catch-done'),450);return}
+  requestAnimationFrame(loop);
+}
+
+const picks=['✊','✌️','✋'];
+const reasons=[
+  'Ножницы бьют камень, потому что они острые. Логично же.',
+  'Это был не камень, а шаурма. Шаурма бьёт всё.',
+  'Я показал на полсекунды раньше - значит считается.',
+  'Бумага бьёт ножницы, я её заламинировал.',
+  'У меня было две руки, значит я выбрал два раза.',
+  'Ничья. Но ничья в мою пользу.'
+];
+let round=0, pool=[];
+function rps(i){
+  if(round>=3)return;
+  if(!pool.length)pool=reasons.slice().sort(()=>Math.random()-.5);
+  round++;
+  const mine=picks[Math.floor(Math.random()*3)];
+  $('#rps-out').innerHTML=`Ты: ${picks[i]} &nbsp;·&nbsp; Я: ${mine}<br><b>Я победил.</b> ${pool.pop()}`;
+  $('#rps-score').textContent=`Счёт: я ${round} - Кира 0`;
+  if(round>=3){
+    $('#rps-btns').classList.add('hide');
+    setTimeout(()=>$('#rps-next').classList.remove('hide'),900);
+  }
+}
+
+function pushMe(){
+  $('#push-btn').classList.add('hide');
+  $('#kira').classList.add('push');
+  setTimeout(()=>$('#me').classList.add('pushed'),150);
+  setTimeout(()=>{
+    $('#splash').classList.add('on');
+    $('#pud-text').innerHTML='<b>ПЛЮХ.</b> Победа Киры.<br>Окончательная и бесповоротная.';
+    $('#pud-next').classList.remove('hide');
+  },900);
+}
+
+function finale(){ show('#s-final'); }
+function restart(){
+  $('#field').innerHTML='';
+  round=0; pool=[];
+  $('#rps-out').textContent='Выбирай 👇';
+  $('#rps-score').textContent='Счёт: я 0 - Кира 0';
+  $('#rps-btns').classList.remove('hide'); $('#rps-next').classList.add('hide');
+  $('#push-btn').classList.remove('hide'); $('#pud-next').classList.add('hide');
+  $('#kira').classList.remove('push'); $('#me').classList.remove('pushed'); $('#splash').classList.remove('on');
+  $('#pud-text').textContent='Есть только один способ восстановить справедливость.';
+  show('#s-start');
+}
+</script>
+</body>
+</html>
